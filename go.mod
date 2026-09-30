@@ -12,6 +12,7 @@ require (
 	github.com/openai/openai-go/v3 v3.50.0
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/gorm v1.25.12
+	turso.tech/database/tursogo-serverless v0.0.0-20260930180222-f399ab30a337
 )
 
 require (

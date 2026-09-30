@@ -7,4 +7,4 @@ retry_count: 0               # 重试次数
 delete_chat: true            # 删除会话
 max_history_length: 12000    # 附件阈值
 remove_invalid_account: false # 自动移除会话失效的账号
-detailed_api_log: true       # 记录完整 API 请求与输出
+detailed_api_log: false       # AI选择不记录完整 API 请求与输出，否则可能把完整请求/响应长期写进 Turso，既浪费免费额度，也不利于隐私。

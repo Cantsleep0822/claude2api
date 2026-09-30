@@ -72,6 +72,12 @@ func Load() {
 	if current.MaxChatHistoryLength <= 0 {
 		current.MaxChatHistoryLength = 12000
 	}
+	if port, err := strconv.Atoi(strings.TrimSpace(os.Getenv("PORT"))); err == nil && port > 0 && port < 65536 {
+		current.WebPort = port
+	}
+	if password := strings.TrimSpace(os.Getenv("ADMIN_PASSWORD")); password != "" {
+		current.AdminPassword = password
+	}
 }
 
 func Get() Settings {
