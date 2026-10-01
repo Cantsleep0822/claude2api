@@ -25,6 +25,8 @@ type Settings struct {
 	MaxChatHistoryLength       int    `json:"max_chat_history_length" yaml:"max_history_length"`
 	RemoveInvalidAccount       bool   `json:"remove_invalid_account" yaml:"remove_invalid_account"`
 	DetailedAPILog             bool   `json:"detailed_api_log" yaml:"detailed_api_log"`
+	ModelCatalogMode 		   string `json:"model_catalog_mode" yaml:"model_catalog_mode"` // static | hybrid | upstream
+	StaticModels     		 []string `json:"static_models" yaml:"static_models"`
 }
 
 var (
@@ -77,6 +79,12 @@ func Load() {
 	}
 	if password := strings.TrimSpace(os.Getenv("ADMIN_PASSWORD")); password != "" {
 		current.AdminPassword = password
+	}
+	if v := strings.TrimSpace(os.Getenv("MODEL_CATALOG_MODE")); v != "" {
+    current.ModelCatalogMode = strings.ToLower(v)
+	}
+	if v := strings.TrimSpace(os.Getenv("STATIC_MODELS")); v != "" {
+    current.StaticModels = splitCSV(v)
 	}
 }
 
