@@ -12,36 +12,35 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-var staticModelIDs = []string{
-	"claude-sonnet-4-6",
-	"claude-sonnet-4-6-thinking",
-	"claude-haiku-4-5-20251001",
-	"claude-haiku-4-5-20251001-thinking",
-	"claude-sonnet-5",
-	"claude-sonnet-5-thinking",
-		"claude-sonnet-5-5",
-	"claude-sonnet-5-5-thinking",
-}
-
 func ListModels(c *gin.Context) {
-	now := time.Now().Unix()
-	data := make([]ModelInfo, 0, len(staticModelIDs))
+	ids, err := service.AvailableModelIDs()
+	if err != nil {
+		slog.Warn("[models] 获取动态模型目录失败", "err", err)
+		apiError(
+			c,
+			http.StatusBadGateway,
+			"无法从 Claude.ai 获取动态模型目录；请查看 Render Logs",
+		)
+		return
+	}
 
-	for _, id := range staticModelIDs {
-		data = append(data, ModelInfo{
-			ID:      id,
-			Object:  "model",
-			Created: now,
-			OwnedBy: "anthropic",
+	c.Header("X-Model-Catalog-Source", "claude-bootstrap")
+
+	now := time.Now().Unix()
+	data := make([]gin.H, 0, len(ids))
+
+	for _, id := range ids {
+		data = append(data, gin.H{
+			"id":       id,
+			"object":   "model",
+			"created":  now,
+			"owned_by": "anthropic",
 		})
 	}
 
-	c.Header("X-Model-Catalog-Source", "static")
-	c.Header("X-Model-Catalog-Stale", "true")
-
-	c.JSON(http.StatusOK, ModelListResponse{
-		Object: "list",
-		Data:   data,
+	c.JSON(http.StatusOK, gin.H{
+		"object": "list",
+		"data":   data,
 	})
 }
 
