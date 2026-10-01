@@ -27,19 +27,20 @@ func ListModels(c *gin.Context) {
 	c.Header("X-Model-Catalog-Source", "claude-bootstrap")
 
 	now := time.Now().Unix()
-	data := make([]ModelInfo, 0, len(ids))
+	data := make([]gin.H, 0, len(ids))
+
 	for _, id := range ids {
-		data = append(data, ModelInfo{
-			ID:      id,
-			Object:  "model",
-			Created: now,
-			OwnedBy: "anthropic",
+		data = append(data, gin.H{
+			"id":       id,
+			"object":   "model",
+			"created":  now,
+			"owned_by": "anthropic",
 		})
 	}
 
-	c.JSON(http.StatusOK, ModelListResponse{
-		Object: "list",
-		Data:   data,
+	c.JSON(http.StatusOK, gin.H{
+		"object": "list",
+		"data":   data,
 	})
 }
 
