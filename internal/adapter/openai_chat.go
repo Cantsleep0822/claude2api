@@ -5,36 +5,41 @@ import (
 	"net/http"
 	"strings"
 	"time"
-
+	"log/slog"
+	
 	"claude2api/internal/service"
 
 	"github.com/gin-gonic/gin"
 )
 
 func ListModels(c *gin.Context) {
-	now := time.Now().Unix()
-
 	ids, err := service.AvailableModelIDs()
-	if err != nil || len(ids) == 0 {
-		// Claude.ai 网页接口临时失败时，保持旧版本行为。
-		for _, id := range supportedModels {
-			ids = append(ids, id, id+"-thinking")
-		}
+	if err != nil {
+		slog.Warn("[models] 获取动态模型目录失败", "err", err)
+		apiError(
+			c,
+			http.StatusBadGateway,
+			"无法从 Claude.ai 获取动态模型目录；请查看 Render Logs",
+		)
+		return
 	}
 
-	data := make([]gin.H, 0, len(ids))
+	c.Header("X-Model-Catalog-Source", "claude-bootstrap")
+
+	now := time.Now().Unix()
+	data := make([]ModelInfo, 0, len(ids))
 	for _, id := range ids {
-		data = append(data, gin.H{
-			"id":       id,
-			"object":   "model",
-			"created":  now,
-			"owned_by": "anthropic",
+		data = append(data, ModelInfo{
+			ID:      id,
+			Object:  "model",
+			Created: now,
+			OwnedBy: "anthropic",
 		})
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"object": "list",
-		"data":   data,
+	c.JSON(http.StatusOK, ModelListResponse{
+		Object: "list",
+		Data:   data,
 	})
 }
 
