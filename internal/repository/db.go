@@ -15,7 +15,6 @@ import (
 )
 
 var db *gorm.DB
-func Ready() bool { return db != nil }
 
 // InitDB 初始化 Turso 数据库。
 func InitDB() error {
