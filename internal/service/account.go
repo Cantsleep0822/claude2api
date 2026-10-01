@@ -27,16 +27,7 @@ func SessionKey(account *repository.Account) string {
 }
 
 func AccountUsable(account *repository.Account) bool {
-	if SessionKey(account) == "" {
-		return false
-	}
-
-	switch strings.TrimSpace(account.Status) {
-	case "", "active":
-		return true
-	default:
-		return false
-	}
+	return SessionKey(account) != "" && account.Status != "expired"
 }
 
 func AccountByEmail(email string) *repository.Account {
