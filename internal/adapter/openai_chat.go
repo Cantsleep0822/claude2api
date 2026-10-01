@@ -13,15 +13,29 @@ import (
 
 func ListModels(c *gin.Context) {
 	now := time.Now().Unix()
-	data := make([]gin.H, 0)
-	for _, id := range supportedModels {
-		for _, model := range []string{id, id + "-thinking"} {
-			data = append(data, gin.H{
-				"id": model, "object": "model", "created": now, "owned_by": "anthropic",
-			})
+
+	ids, err := service.AvailableModelIDs()
+	if err != nil || len(ids) == 0 {
+		// Claude.ai 网页接口临时失败时，保持旧版本行为。
+		for _, id := range supportedModels {
+			ids = append(ids, id, id+"-thinking")
 		}
 	}
-	c.JSON(http.StatusOK, gin.H{"object": "list", "data": data})
+
+	data := make([]gin.H, 0, len(ids))
+	for _, id := range ids {
+		data = append(data, gin.H{
+			"id":       id,
+			"object":   "model",
+			"created":  now,
+			"owned_by": "anthropic",
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"object": "list",
+		"data":   data,
+	})
 }
 
 type openAIChatRequest struct {
