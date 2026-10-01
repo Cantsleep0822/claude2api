@@ -147,24 +147,35 @@ func modelIDsForAccount(account *repository.Account) ([]string, error) {
 }
 
 func (claudeAI *ClaudeAI) GetAvailableModels() ([]string, error) {
-	if strings.TrimSpace(claudeAI.orgUUID) == "" {
-		return nil, errors.New("账号缺少组织 UUID")
+	orgID := strings.TrimSpace(claudeAI.orgUUID)
+	if orgID == "" {
+		return nil, errors.New("缺少 Claude organization UUID")
 	}
 
-	u, err := url.Parse(claudeAIBaseURL)
-	if err == nil {
+	if u, err := url.Parse(claudeAIBaseURL); err == nil {
 		claudeAI.client.SetCookies(u, []*fhttp.Cookie{{
-			Name: "lastActiveOrg", Value: claudeAI.orgUUID, Domain: "claude.ai",
+			Name:   "lastActiveOrg",
+			Value:  orgID,
+			Domain: "claude.ai",
 		}})
 	}
 
-	req, err := claudeAI.request(
-		fhttp.MethodGet,
-		fmt.Sprintf("%s/api/organizations/%s", claudeAIBaseURL, claudeAI.orgUUID),
-		nil,
+	params := url.Values{}
+	params.Set("statsig_hashing_algorithm", "djb2")
+	params.Set("growthbook_format", "sdk")
+	params.Set("cache_bust", "1")
+	params.Set("include_system_prompts", "false")
+
+	endpoint := fmt.Sprintf(
+		"%s/edge-api/bootstrap/%s/app_start?%s",
+		strings.TrimRight(claudeAIBaseURL, "/"),
+		url.PathEscape(orgID),
+		params.Encode(),
 	)
+
+	req, err := fhttp.NewRequest(fhttp.MethodGet, endpoint, nil)
 	if err != nil {
-		return nil, fmt.Errorf("构造模型列表请求失败: %w", err)
+		return nil, fmt.Errorf("创建模型目录请求失败: %w", err)
 	}
 
 	req.Header.Set("accept", "application/json")
@@ -172,51 +183,58 @@ func (claudeAI *ClaudeAI) GetAvailableModels() ([]string, error) {
 
 	resp, err := claudeAI.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("查询模型列表失败: %w", err)
+		return nil, fmt.Errorf("请求 Claude bootstrap 失败: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("读取模型列表失败: %w", err)
+		return nil, fmt.Errorf("读取 Claude bootstrap 响应失败: %w", err)
 	}
-	if resp.StatusCode != fhttp.StatusOK {
+
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		return nil, fmt.Errorf(
-			"查询模型列表 HTTP %d: %s",
+			"查询 Claude 模型目录失败，HTTP %d: %s",
 			resp.StatusCode,
 			utils.Truncate(string(body), 200),
 		)
 	}
 
-	var org struct {
-		Models []struct {
-			Model    string `json:"model"`
-			Inactive bool   `json:"inactive"`
-			Overflow bool   `json:"overflow"`
-		} `json:"claude_ai_bootstrap_models_config"`
+	var payload struct {
+		AvailableModels struct {
+			Models []struct {
+				ModelID string `json:"model_id"`
+				Model   string `json:"model"`
+			} `json:"models"`
+		} `json:"claude_ai_available_models"`
 	}
 
-	if err := json.Unmarshal(body, &org); err != nil {
-		return nil, fmt.Errorf("解析模型列表失败: %w", err)
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return nil, fmt.Errorf("解析 Claude bootstrap 模型目录失败: %w", err)
 	}
 
-	seen := map[string]struct{}{}
-	models := make([]string, 0, len(org.Models))
+	seen := make(map[string]struct{})
+	models := make([]string, 0, len(payload.AvailableModels.Models))
 
-	for _, item := range org.Models {
-		id := strings.TrimSpace(item.Model)
-		if id == "" || item.Inactive || item.Overflow {
+	for _, item := range payload.AvailableModels.Models {
+		id := strings.TrimSpace(item.ModelID)
+		if id == "" {
+			id = strings.TrimSpace(item.Model)
+		}
+		if id == "" {
 			continue
 		}
 		if _, exists := seen[id]; exists {
 			continue
 		}
+
 		seen[id] = struct{}{}
 		models = append(models, id)
 	}
 
 	if len(models) == 0 {
-		return nil, errors.New("上游未返回可用模型")
+		return nil, errors.New("Claude bootstrap 响应中没有 claude_ai_available_models.models")
 	}
+
 	return models, nil
 }
